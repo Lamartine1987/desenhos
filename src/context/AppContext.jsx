@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, storage } from '../firebase';
-import { collection, onSnapshot, addDoc, updateDoc, doc, query, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, storage, auth } from '../firebase';
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, where, getDocs, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 const AppContext = createContext();
 
@@ -11,82 +12,141 @@ export const AppProvider = ({ children }) => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Listen to Modules
+  // Listen to Modules and Submissions based on user role
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'modules'), (snapshot) => {
+    if (!user) {
+      setModules([]);
+      setSubmissions([]);
+      return;
+    }
+
+    // Listen to Modules (All authenticated users can read modules)
+    const unsubModules = onSnapshot(collection(db, 'modules'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setModules(data.sort((a, b) => a.createdAt - b.createdAt));
+    }, (error) => {
+      console.error("Error listening to modules: ", error);
     });
-    return unsub;
-  }, []);
 
-  // Listen to Submissions
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'submissions'), (snapshot) => {
+    // Listen to Submissions
+    let subQuery;
+    if (user.role === 'professor') {
+      subQuery = collection(db, 'submissions'); // Professors can read all
+    } else {
+      subQuery = query(collection(db, 'submissions'), where('studentId', '==', user.id)); // Students read their own
+    }
+
+    const unsubSubmissions = onSnapshot(subQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSubmissions(data.sort((a, b) => b.timestamp - a.timestamp));
+    }, (error) => {
+      console.error("Error listening to submissions: ", error);
+    });
+
+    return () => {
+      unsubModules();
+      unsubSubmissions();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch user data from firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUser({ id: firebaseUser.uid, email: firebaseUser.email, ...userDoc.data() });
+        } else {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
     });
     return unsub;
   }, []);
 
-  useEffect(() => {
-    // Check local storage for session
-    const savedUser = localStorage.getItem('artreview_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+  const login = async (email, password) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const loggedUser = { id: userCredential.user.uid, email: userCredential.user.email, ...userDoc.data() };
+        setUser(loggedUser);
+        return { success: true, user: loggedUser };
+      } else {
+        await signOut(auth);
+        return { success: false, error: 'Dados do usuário não encontrados.' };
+      }
+    } catch (error) {
+      console.error("Login error: ", error);
+      return { success: false, error: 'E-mail ou senha incorretos!' };
     }
-    setLoading(false);
-  }, []);
+  };
 
-  const login = async (phone, password) => {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('phone', '==', phone));
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return { success: false, error: 'Usuário não encontrado!' };
-    } 
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    
-    if (userData.password === password) {
-      const loggedUser = { id: userDoc.id, ...userData };
+  const registerUser = async (name, email, phone, password) => {
+    try {
+      console.log("=== INICIANDO CADASTRO ===");
+      console.log("Email:", email);
+      console.log("Firebase API Key usada:", auth.app.options.apiKey);
+      console.log("Chamando createUserWithEmailAndPassword...");
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      console.log("Usuário criado no auth com UID:", userCredential.user.uid);
+      
+      const newUser = {
+        name,
+        phone,
+        email,
+        role: 'student'
+      };
+      
+      // Save extra data in Firestore using the auth UID
+      console.log("Salvando dados no Firestore...");
+      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+      
+      const loggedUser = { id: userCredential.user.uid, ...newUser };
       setUser(loggedUser);
-      localStorage.setItem('artreview_user', JSON.stringify(loggedUser));
+      console.log("Cadastro finalizado com sucesso!");
       return { success: true, user: loggedUser };
-    } else {
-      return { success: false, error: 'Senha incorreta!' };
+    } catch (error) {
+      console.error("=== ERRO AO CADASTRAR ===");
+      console.error("Código do erro:", error.code);
+      console.error("Mensagem do erro:", error.message);
+      console.error("Stack trace:", error.stack);
+      console.dir(error); // Logs the entire error object
+      
+      if (error.code === 'auth/email-already-in-use') {
+        return { success: false, error: 'Este e-mail já está em uso.' };
+      }
+      if (error.code === 'auth/weak-password') {
+        return { success: false, error: 'A senha deve ter pelo menos 6 caracteres.' };
+      }
+      if (error.code === 'auth/api-key-not-valid') {
+         return { success: false, error: 'Chave de API do Firebase inválida. Verifique o arquivo firebase.js' };
+      }
+      return { success: false, error: 'Erro ao cadastrar. Veja o console.' };
     }
   };
 
-  const registerUser = async (name, phone, password, isProfessor = false) => {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('phone', '==', phone));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      return { success: false, error: 'Este telefone já está cadastrado!' };
-    }
-
-    const newUser = {
-      name,
-      phone,
-      password, // In a real app, hash this!
-      role: isProfessor ? 'professor' : 'student'
-    };
-    
-    const docRef = await addDoc(usersRef, newUser);
-    const loggedUser = { id: docRef.id, ...newUser };
-    
-    setUser(loggedUser);
-    localStorage.setItem('artreview_user', JSON.stringify(loggedUser));
-    return { success: true, user: loggedUser };
-  };
-
-  const logout = () => {
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
-    localStorage.removeItem('artreview_user');
+  };
+
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      console.error("Reset password error: ", error);
+      return { success: false, error: 'Erro ao enviar e-mail de recuperação. Verifique o e-mail digitado.' };
+    }
   };
 
   const addModule = async (name, description) => {
@@ -132,6 +192,24 @@ export const AppProvider = ({ children }) => {
     await updateDoc(subRef, { status: 'evaluated' });
   };
 
+  const saveEvaluation = async (submissionId, fileObj) => {
+    try {
+      const storageRef = ref(storage, `evaluations/${submissionId}_${Date.now()}.jpg`);
+      await uploadBytes(storageRef, fileObj);
+      const evaluatedImageUrl = await getDownloadURL(storageRef);
+
+      const subRef = doc(db, 'submissions', submissionId);
+      await updateDoc(subRef, { 
+        status: 'evaluated',
+        evaluatedImageUrl 
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error saving evaluation: ", error);
+      return { success: false, error: 'Erro ao salvar avaliação.' };
+    }
+  };
+
   const deleteSubmission = async (submissionId) => {
     try {
       await deleteDoc(doc(db, 'submissions', submissionId));
@@ -162,11 +240,70 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error("Error fetching users: ", error);
+      return [];
+    }
+  };
+
+  const updateUserRole = async (userId, newRole) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating user role: ", error);
+      return { success: false, error: 'Erro ao atualizar permissão.' };
+    }
+  };
+
+  const updateUserProfile = async (newName, currentPassword, newPassword) => {
+    if (!user) return { success: false, error: 'Usuário não logado.' };
+    try {
+      await updateDoc(doc(db, 'users', user.id), { name: newName });
+      
+      if (newPassword) {
+        if (!currentPassword) {
+          return { success: false, error: 'Para alterar a senha, digite a sua senha atual.' };
+        }
+        
+        try {
+          // Re-authenticate user first
+          const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+          await reauthenticateWithCredential(auth.currentUser, credential);
+          
+          // Then update the password
+          await updatePassword(auth.currentUser, newPassword);
+        } catch (pwError) {
+          console.error("Error updating password: ", pwError);
+          if (pwError.code === 'auth/invalid-credential' || pwError.code === 'auth/wrong-password') {
+            return { success: false, error: 'A senha atual está incorreta.' };
+          }
+          if (pwError.code === 'auth/weak-password') {
+            return { success: false, error: 'A nova senha deve ter no mínimo 6 caracteres.' };
+          }
+          return { success: false, error: 'Erro ao alterar a senha.' };
+        }
+      }
+      
+      const updatedUser = { ...user, name: newName };
+      setUser(updatedUser);
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating profile: ", error);
+      return { success: false, error: 'Erro ao atualizar perfil.' };
+    }
+  };
+
   return (
     <AppContext.Provider value={{
-      user, login, registerUser, logout, loading,
+      user, login, registerUser, logout, resetPassword, loading,
       modules, addModule, deleteModule, toggleModuleVisibility,
-      submissions, addSubmission, markEvaluated, deleteSubmission
+      submissions, addSubmission, markEvaluated, saveEvaluation, deleteSubmission,
+      fetchUsers, updateUserRole, updateUserProfile
     }}>
       {!loading && children}
     </AppContext.Provider>

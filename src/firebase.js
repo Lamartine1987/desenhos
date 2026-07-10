@@ -4,7 +4,7 @@ import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBpTTy_ur-W06952Sy1CwRnlrhZpD_YxXc",
+  apiKey: "AIzaSyBpTTy_ur-WO6952Sy1CwRnlrhZpD_YrXc",
   authDomain: "sistema-desenhos.firebaseapp.com",
   projectId: "sistema-desenhos",
   storageBucket: "sistema-desenhos.firebasestorage.app",

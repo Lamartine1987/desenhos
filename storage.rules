@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    match /submissions/{fileName} {
+      // Qualquer usuário autenticado pode ler e gravar. 
+      // (A segurança real está no Firestore, que não deixa ele salvar um envio falso no banco)
+      allow read, write: if isAuth();
+    }
+    
+    match /evaluations/{fileName} {
+      // Qualquer autenticado pode ler e gravar avaliações
+      allow read, write: if isAuth();
+    }
+  }
+}

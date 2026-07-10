@@ -4,14 +4,16 @@ import { useAppContext } from '../context/AppContext';
 import { ArrowLeft, Download, CheckCircle, DownloadCloud, Image as ImageIcon } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import EvaluationStudio from '../components/EvaluationStudio';
 
 export default function ProfessorSubmissions() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { modules, submissions, markEvaluated, user } = useAppContext();
+  const { modules, submissions, markEvaluated, saveEvaluation, user } = useAppContext();
   
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'evaluated'
   const [selectedImage, setSelectedImage] = useState(null);
+  const [evaluatingSubmission, setEvaluatingSubmission] = useState(null);
 
   if (!user || user.role !== 'professor') return <div>Acesso negado</div>;
 
@@ -85,16 +87,16 @@ export default function ProfessorSubmissions() {
         Voltar
       </button>
 
-      <div className="flex justify-between items-end flex-wrap gap-4">
-        <div>
+      <div className="flex justify-between items-center mobile-col gap-4">
+        <div className="mobile-w-full">
           <h2 className="text-3xl font-bold text-gradient mb-2">{module.name}</h2>
           <p className="text-muted">Avaliando artes dos alunos.</p>
         </div>
         
-        <div className="flex gap-4">
+        <div className="flex mobile-col gap-4 mobile-w-full">
           <select 
-            className="input-field" 
-            style={{ width: 'auto', py: '0.5rem' }}
+            className="input-field flex-1" 
+            style={{ width: 'auto', padding: '0.6rem 1rem' }}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -103,7 +105,7 @@ export default function ProfessorSubmissions() {
             <option value="evaluated">Já Avaliadas</option>
           </select>
 
-          <button className="btn btn-primary" onClick={handleDownloadAll} disabled={moduleSubmissions.length === 0}>
+          <button className="btn btn-primary flex-1" onClick={handleDownloadAll} disabled={moduleSubmissions.length === 0}>
             <DownloadCloud size={20} />
             Baixar .zip ({moduleSubmissions.length})
           </button>
@@ -115,7 +117,7 @@ export default function ProfessorSubmissions() {
           <div key={sub.id} className="glass-card flex flex-col overflow-hidden">
             <div 
               style={{ position: 'relative', height: '250px', backgroundColor: 'rgba(0,0,0,0.05)', cursor: 'pointer' }}
-              onClick={() => setSelectedImage(sub.imageUrl)}
+              onClick={() => setSelectedImage({ original: sub.imageUrl, evaluated: sub.evaluatedImageUrl })}
               title="Clique para ampliar"
             >
               <img 
@@ -123,6 +125,13 @@ export default function ProfessorSubmissions() {
                 alt="Arte do Aluno" 
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
               />
+              {sub.evaluatedImageUrl && (
+                <img 
+                  src={sub.evaluatedImageUrl} 
+                  alt="Correção do Professor" 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} 
+                />
+              )}
               <div style={{ position: 'absolute', top: '0.5rem', left: '0.5rem' }}>
                 <span className={`badge ${sub.status === 'evaluated' ? 'badge-evaluated' : 'badge-pending'}`} style={{ backdropFilter: 'blur(4px)' }}>
                   {sub.status === 'evaluated' ? 'Avaliado' : 'Pendente'}
@@ -152,8 +161,8 @@ export default function ProfessorSubmissions() {
                   <button 
                     className="btn btn-primary flex-1"
                     style={{ padding: '0.5rem' }}
-                    onClick={() => markEvaluated(sub.id)}
-                    title="Marcar como Avaliado"
+                    onClick={() => setEvaluatingSubmission(sub)}
+                    title="Avaliar e Corrigir"
                   >
                     <CheckCircle size={18} />
                     Avaliar
@@ -174,9 +183,18 @@ export default function ProfessorSubmissions() {
         ))}
 
         {moduleSubmissions.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted glass-panel flex flex-col items-center justify-center gap-4">
-            <ImageIcon size={48} className="opacity-20" />
-            <p>Nenhuma arte encontrada para este filtro.</p>
+          <div className="col-span-full py-16 text-center glass-panel flex flex-col items-center justify-center gap-4" style={{ background: 'rgba(255,255,255,0.02)', borderStyle: 'dashed', borderWidth: '2px' }}>
+            <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1.5rem', borderRadius: '50%' }}>
+              <ImageIcon size={48} className="text-primary opacity-80" />
+            </div>
+            <h3 className="text-xl font-bold mt-2 text-gradient">Nenhuma arte por aqui!</h3>
+            <p className="text-muted max-w-md">
+              {filter === 'pending' 
+                ? "Oba! Parece que você já corrigiu todos os desenhos pendentes deste módulo. Excelente trabalho!" 
+                : filter === 'evaluated' 
+                  ? "Você ainda não avaliou nenhuma arte neste módulo. Quando você corrigir, elas aparecerão aqui." 
+                  : "Nenhum aluno enviou desenhos para este módulo ainda. Aguarde os primeiros envios!"}
+            </p>
           </div>
         )}
       </div>
@@ -191,12 +209,36 @@ export default function ProfessorSubmissions() {
           }}
           onClick={() => setSelectedImage(null)}
         >
-          <img 
-            src={selectedImage} 
-            alt="Desenho em tamanho real" 
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '0.5rem' }} 
-          />
+          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%', display: 'inline-block' }}>
+            <img 
+              src={selectedImage.original} 
+              alt="Desenho em tamanho real" 
+              style={{ maxWidth: '100%', maxHeight: '100vh', objectFit: 'contain', borderRadius: '0.5rem' }} 
+            />
+            {selectedImage.evaluated && (
+              <img 
+                src={selectedImage.evaluated} 
+                alt="Correção em tamanho real" 
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', borderRadius: '0.5rem', pointerEvents: 'none' }} 
+              />
+            )}
+          </div>
         </div>
+      )}
+
+      {evaluatingSubmission && (
+        <EvaluationStudio 
+          submission={evaluatingSubmission} 
+          onClose={() => setEvaluatingSubmission(null)}
+          onSave={async (file) => {
+            const result = await saveEvaluation(evaluatingSubmission.id, file);
+            if (result.success) {
+              setEvaluatingSubmission(null);
+            } else {
+              alert(result.error); // Fallback error handling
+            }
+          }}
+        />
       )}
     </div>
   );

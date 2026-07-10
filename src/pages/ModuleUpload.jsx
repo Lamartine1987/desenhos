@@ -156,7 +156,7 @@ export default function ModuleUpload() {
             style={{ 
               border: `2px dashed ${isDragging ? 'var(--primary)' : '#d4d4d8'}`,
               borderRadius: 'var(--radius-lg)',
-              padding: '4rem 2rem',
+              padding: '2rem 1rem',
               backgroundColor: isDragging ? 'rgba(249, 115, 22, 0.05)' : '#f4f4f5',
               transition: 'var(--transition)',
               cursor: 'pointer'

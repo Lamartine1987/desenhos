@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função para checar se o usuário está logado
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Função para checar se o usuário logado é um professor
+    // Ele faz uma leitura no próprio banco para ver se a role dele é 'professor'
+    function isProfessor() {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professor';
+    }
+
+    match /users/{userId} {
+      // Qualquer usuário logado pode ler a lista de usuários (necessário para professores e para o próprio aluno)
+      allow read: if isAuth();
+      
+      // Criação de perfil: pode criar se for o próprio usuário, e garante que ele NÃO está se criando como professor.
+      allow create: if isAuth() 
+                    && request.auth.uid == userId 
+                    && request.resource.data.role != 'professor';
+      
+      // Atualização: 
+      // 1. O usuário pode atualizar a si mesmo, desde que a "role" (permissão) não mude.
+      // 2. OU o professor pode atualizar qualquer um (inclusive mudar roles).
+      allow update: if (isAuth() && request.auth.uid == userId && request.resource.data.get('role', resource.data.role) == resource.data.role) 
+                    || isProfessor();
+                    
+      // Só professores podem excluir contas
+      allow delete: if isProfessor();
+    }
+    
+    match /modules/{moduleId} {
+      // Alunos podem ler os módulos
+      allow read: if isAuth();
+      // Somente professores podem criar, alterar ou excluir módulos
+      allow write: if isProfessor();
+    }
+    
+    match /submissions/{submissionId} {
+      // Leitura: O próprio aluno que enviou pode ler, ou qualquer professor.
+      allow read: if isAuth() && (resource.data.studentId == request.auth.uid || isProfessor());
+      
+      // Criação: O aluno pode criar o envio, mas garantimos que o studentId salvo é realmente o UID dele.
+      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
+      
+      // Atualização e Exclusão: Apenas o professor pode fazer isso (para dar notas ou excluir envios).
+      allow update, delete: if isProfessor();
+    }
+  }
+}

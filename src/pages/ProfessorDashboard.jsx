@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { Folder, Plus, LayoutDashboard, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Folder, Plus, Eye, EyeOff, Trash2, Users } from 'lucide-react';
+import ProfessorUsers from '../components/ProfessorUsers';
+import ProfessorAnalytics from '../components/ProfessorAnalytics';
+import { BarChart3 } from 'lucide-react';
 
 export default function ProfessorDashboard() {
   const { modules, addModule, submissions, user, deleteModule, toggleModuleVisibility } = useAppContext();
   const navigate = useNavigate();
   
+  const [activeTab, setActiveTab] = useState('modules'); // 'modules', 'users', 'analytics'
   const [showModal, setShowModal] = useState(false);
   const [newModName, setNewModName] = useState('');
   const [newModDesc, setNewModDesc] = useState('');
@@ -26,81 +30,113 @@ export default function ProfessorDashboard() {
 
   return (
     <div className="flex flex-col gap-8 relative">
-      <div className="flex justify-between items-end flex-wrap gap-4">
-        <div>
+      <div className="flex justify-between items-center mobile-col gap-4">
+        <div className="mobile-w-full">
           <h2 className="text-3xl font-bold mb-2">Painel do Professor</h2>
-          <p className="text-muted">Gerencie seus módulos e avalie os desenhos dos alunos.</p>
+          <p className="text-muted">Gerencie seus módulos, usuários e avalie os desenhos.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={20} />
-          Novo Módulo
+        {activeTab === 'modules' && (
+          <button className="btn btn-primary mobile-w-full w-max" onClick={() => setShowModal(true)}>
+            <Plus size={20} />
+            Novo Módulo
+          </button>
+        )}
+      </div>
+
+      <div className="tabs-container">
+        <button 
+          className={`tab-btn ${activeTab === 'modules' ? 'active' : ''}`}
+          onClick={() => setActiveTab('modules')}
+        >
+          <Folder size={18} />
+          Módulos
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => setActiveTab('users')}
+        >
+          <Users size={18} />
+          Gerenciar Usuários
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          <BarChart3 size={18} />
+          Estatísticas
         </button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-        {modules.map(mod => {
-          const modSubmissions = submissions.filter(s => s.moduleId === mod.id);
-          const pendingCount = modSubmissions.filter(s => s.status === 'pending').length;
-          const evaluatedCount = modSubmissions.filter(s => s.status === 'evaluated').length;
+      {activeTab === 'modules' ? (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
+          {modules.map(mod => {
+            const modSubmissions = submissions.filter(s => s.moduleId === mod.id);
+            const pendingCount = modSubmissions.filter(s => s.status === 'pending').length;
+            const evaluatedCount = modSubmissions.filter(s => s.status === 'evaluated').length;
 
-          return (
-            <div 
-              key={mod.id} 
-              className="glass-card" 
-              style={{ padding: '1.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
-              onClick={() => navigate(`/professor/modulo/${mod.id}`)}
-            >
-              <div className="flex items-center gap-3 mb-2 justify-between">
-                <div className="flex items-center gap-3">
-                  <div style={{ background: 'rgba(236, 72, 153, 0.2)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                    <Folder className="text-secondary" size={24} />
+            return (
+              <div 
+                key={mod.id} 
+                className="glass-card" 
+                style={{ padding: '1.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+                onClick={() => navigate(`/professor/modulo/${mod.id}`)}
+              >
+                <div className="flex items-center gap-3 mb-2 justify-between">
+                  <div className="flex items-center gap-3">
+                    <div style={{ background: 'rgba(236, 72, 153, 0.2)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                      <Folder className="text-secondary" size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.name}</h3>
                   </div>
-                  <h3 className="text-xl font-bold" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.name}</h3>
+                  
+                  <div className="flex gap-2">
+                     <button
+                       onClick={async (e) => {
+                         e.stopPropagation();
+                         await toggleModuleVisibility(mod.id, mod.hidden);
+                       }}
+                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                       title={mod.hidden ? "Mostrar para alunos" : "Ocultar dos alunos"}
+                     >
+                       {mod.hidden ? <EyeOff size={20} /> : <Eye size={20} />}
+                     </button>
+                     <button
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setModuleToDelete(mod);
+                       }}
+                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                       title="Excluir módulo"
+                     >
+                       <Trash2 size={20} />
+                     </button>
+                  </div>
                 </div>
+                <p className="text-muted text-sm mb-6 flex-1 line-clamp-2" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.description}</p>
                 
-                <div className="flex gap-2">
-                   <button
-                     onClick={async (e) => {
-                       e.stopPropagation();
-                       await toggleModuleVisibility(mod.id, mod.hidden);
-                     }}
-                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-                     title={mod.hidden ? "Mostrar para alunos" : "Ocultar dos alunos"}
-                   >
-                     {mod.hidden ? <EyeOff size={20} /> : <Eye size={20} />}
-                   </button>
-                   <button
-                     onClick={(e) => {
-                       e.stopPropagation();
-                       setModuleToDelete(mod);
-                     }}
-                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
-                     title="Excluir módulo"
-                   >
-                     <Trash2 size={20} />
-                   </button>
+                <div className="flex items-center gap-4 border-t" style={{ borderColor: 'var(--border-color)', paddingTop: '1rem' }}>
+                  <div className="flex flex-col">
+                    <span className="text-2xl font-bold">{modSubmissions.length}</span>
+                    <span className="text-xs text-muted uppercase tracking-wider">Total</span>
+                  </div>
+                  <div className="flex flex-col text-warning">
+                    <span className="text-2xl font-bold">{pendingCount}</span>
+                    <span className="text-xs uppercase tracking-wider">Pendentes</span>
+                  </div>
+                  <div className="flex flex-col text-success">
+                    <span className="text-2xl font-bold">{evaluatedCount}</span>
+                    <span className="text-xs uppercase tracking-wider">Avaliados</span>
+                  </div>
                 </div>
               </div>
-              <p className="text-muted text-sm mb-6 flex-1 line-clamp-2" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.description}</p>
-              
-              <div className="flex items-center gap-4 border-t" style={{ borderColor: 'var(--border-color)', paddingTop: '1rem' }}>
-                <div className="flex flex-col">
-                  <span className="text-2xl font-bold">{modSubmissions.length}</span>
-                  <span className="text-xs text-muted uppercase tracking-wider">Total</span>
-                </div>
-                <div className="flex flex-col text-warning">
-                  <span className="text-2xl font-bold">{pendingCount}</span>
-                  <span className="text-xs uppercase tracking-wider">Pendentes</span>
-                </div>
-                <div className="flex flex-col text-success">
-                  <span className="text-2xl font-bold">{evaluatedCount}</span>
-                  <span className="text-xs uppercase tracking-wider">Avaliados</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : activeTab === 'users' ? (
+        <ProfessorUsers />
+      ) : (
+        <ProfessorAnalytics />
+      )}
 
       {showModal && (
         <div 
