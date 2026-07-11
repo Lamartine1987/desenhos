@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { ArrowLeft, Download, CheckCircle, DownloadCloud, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Download, CheckCircle, DownloadCloud, Image as ImageIcon, Plus, Edit3, Trash2, Settings, List } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import EvaluationStudio from '../components/EvaluationStudio';
@@ -12,9 +12,15 @@ import { useInView } from 'react-intersection-observer';
 export default function ProfessorSubmissions() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { modules, saveEvaluation, user } = useAppContext();
+  const { modules, saveEvaluation, user, addLesson, editLesson, deleteLesson } = useAppContext();
   
   const [filter, setFilter] = useState('pending'); // 'all', 'pending', 'evaluated'
+  const [lessonFilter, setLessonFilter] = useState('all');
+  
+  // Lesson Management State
+  const [showLessonModal, setShowLessonModal] = useState(false);
+  const [newLessonTitle, setNewLessonTitle] = useState('');
+  const [editingLessonId, setEditingLessonId] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [evaluatingSubmission, setEvaluatingSubmission] = useState(null);
   const [moduleSubmissions, setModuleSubmissions] = useState([]);
@@ -57,6 +63,7 @@ export default function ProfessorSubmissions() {
 
   const filteredSubmissions = moduleSubmissions
     .filter(s => filter === 'all' ? true : s.status === filter)
+    .filter(s => lessonFilter === 'all' ? true : s.lessonId === lessonFilter)
     .sort((a, b) => {
       if (filter === 'evaluated') {
         const timeA = a.evaluationTimestamp || a.timestamp || 0;
@@ -89,13 +96,13 @@ export default function ProfessorSubmissions() {
   };
 
   const handleDownloadAll = async () => {
-    if (moduleSubmissions.length === 0) return;
+    if (filteredSubmissions.length === 0) return;
     
     const zip = new JSZip();
     const folder = zip.folder(`Artes_${module.name}`);
     
     // Create promises for fetching all images
-    const promises = moduleSubmissions.map(async (sub, index) => {
+    const promises = filteredSubmissions.map(async (sub, index) => {
       try {
          let fetchUrl = sub.imageUrl;
          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -119,6 +126,24 @@ export default function ProfessorSubmissions() {
     saveAs(content, `Submissoes_${module.name}.zip`);
   };
 
+  const handleSaveLesson = async (e) => {
+    e.preventDefault();
+    if (!newLessonTitle.trim()) return;
+    
+    if (editingLessonId) {
+      await editLesson(module.id, editingLessonId, newLessonTitle);
+    } else {
+      await addLesson(module.id, newLessonTitle);
+    }
+    setNewLessonTitle('');
+    setEditingLessonId(null);
+  };
+
+  const openEditLesson = (lesson) => {
+    setEditingLessonId(lesson.id);
+    setNewLessonTitle(lesson.title);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <button 
@@ -139,7 +164,19 @@ export default function ProfessorSubmissions() {
         <div className="flex mobile-col gap-4 mobile-w-full">
           <select 
             className="input-field flex-1" 
-            style={{ width: 'auto', padding: '0.6rem 1rem' }}
+            style={{ width: 'auto', padding: '0.6rem 2.5rem 0.6rem 1rem' }}
+            value={lessonFilter}
+            onChange={(e) => setLessonFilter(e.target.value)}
+          >
+            <option value="all">Todas as Aulas</option>
+            {module.lessons?.map(l => (
+              <option key={l.id} value={l.id}>{l.title}</option>
+            ))}
+          </select>
+
+          <select 
+            className="input-field flex-1" 
+            style={{ width: 'auto', padding: '0.6rem 2.5rem 0.6rem 1rem' }}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -148,9 +185,14 @@ export default function ProfessorSubmissions() {
             <option value="evaluated">Já Avaliadas</option>
           </select>
 
-          <button className="btn btn-primary flex-1" onClick={handleDownloadAll} disabled={moduleSubmissions.length === 0}>
+          <button className="btn btn-outline flex-1" onClick={() => setShowLessonModal(true)}>
+            <List size={20} />
+            Gerenciar Aulas
+          </button>
+
+          <button className="btn btn-primary flex-1" onClick={handleDownloadAll} disabled={filteredSubmissions.length === 0}>
             <DownloadCloud size={20} />
-            Baixar .zip ({moduleSubmissions.length})
+            Baixar .zip ({filteredSubmissions.length})
           </button>
         </div>
       </div>
@@ -190,6 +232,9 @@ export default function ProfessorSubmissions() {
             <div className="p-4 flex flex-col gap-4 flex-1">
               <div>
                 <h3 className="font-bold text-lg">{sub.studentName}</h3>
+                <p className="text-sm text-primary mb-1">
+                  Aula: {sub.lessonTitle || 'Não especificada'}
+                </p>
                 <p className="text-sm text-muted">
                   Enviado em {new Date(sub.timestamp).toLocaleDateString()}
                 </p>
@@ -246,14 +291,116 @@ export default function ProfessorSubmissions() {
             <h3 className="text-xl font-bold mt-2 text-gradient">Nenhuma arte por aqui!</h3>
             <p className="text-muted max-w-md">
               {filter === 'pending' 
-                ? "Oba! Parece que você já corrigiu todos os desenhos pendentes deste módulo. Excelente trabalho!" 
+                ? "Oba! Parece que você já corrigiu todos os desenhos pendentes. Excelente trabalho!" 
                 : filter === 'evaluated' 
-                  ? "Você ainda não avaliou nenhuma arte neste módulo. Quando você corrigir, elas aparecerão aqui." 
-                  : "Nenhum aluno enviou desenhos para este módulo ainda. Aguarde os primeiros envios!"}
+                  ? "Você ainda não avaliou nenhuma arte. Quando você corrigir, elas aparecerão aqui." 
+                  : "Nenhum aluno enviou desenhos ainda. Aguarde os primeiros envios!"}
             </p>
           </div>
         )}
       </div>
+
+      {showLessonModal && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 100
+          }}
+        >
+          <div className="glass-panel flex flex-col" style={{ 
+            padding: '2.5rem', width: '90%', maxWidth: '600px', maxHeight: '90vh',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-bold text-gradient">Gerenciar Aulas</h3>
+              <button className="btn btn-outline" style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }} onClick={() => {
+                setShowLessonModal(false);
+                setEditingLessonId(null);
+                setNewLessonTitle('');
+              }}>Fechar</button>
+            </div>
+            
+            <form onSubmit={handleSaveLesson} className="flex gap-3 mb-8" style={{ background: 'rgba(0,0,0,0.02)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <input 
+                type="text" 
+                className="input-field flex-1" 
+                value={newLessonTitle}
+                onChange={(e) => setNewLessonTitle(e.target.value)}
+                placeholder="Título da Nova Aula (ex: Esfera, Luz e Sombra)"
+                required
+                style={{ fontSize: '1rem', padding: '0.8rem 1rem' }}
+              />
+              <button type="submit" className="btn btn-primary" style={{ padding: '0 1.5rem' }}>
+                {editingLessonId ? 'Atualizar' : 'Adicionar'}
+              </button>
+              {editingLessonId && (
+                <button type="button" className="btn btn-outline" onClick={() => {
+                  setEditingLessonId(null);
+                  setNewLessonTitle('');
+                }}>
+                  Cancelar
+                </button>
+              )}
+            </form>
+
+            <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: '400px' }}>
+              <h4 className="font-bold mb-4 text-muted">Aulas Cadastradas</h4>
+              {module.lessons && module.lessons.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {module.lessons.map((lesson, index) => (
+                    <div key={lesson.id} className="flex justify-between items-center" 
+                         style={{ 
+                           background: '#ffffff', 
+                           padding: '1rem 1.5rem', 
+                           borderRadius: '0.75rem', 
+                           border: '1px solid rgba(0,0,0,0.08)',
+                           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                           transition: 'all 0.2s ease'
+                         }}>
+                      <div className="flex items-center gap-3">
+                        <span style={{ 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: '24px', height: '24px', borderRadius: '50%', 
+                          background: 'rgba(249, 115, 22, 0.1)', color: 'var(--primary)',
+                          fontSize: '0.8rem', fontWeight: 'bold'
+                        }}>
+                          {index + 1}
+                        </span>
+                        <span className="font-medium text-lg">{lesson.title}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => openEditLesson(lesson)} 
+                          className="btn btn-outline"
+                          style={{ padding: '0.4rem', border: '1px solid rgba(0,0,0,0.1)', color: 'var(--text-muted)' }}
+                          title="Editar"
+                        >
+                          <Edit3 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => deleteLesson(module.id, lesson.id)} 
+                          className="btn"
+                          style={{ padding: '0.4rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444' }}
+                          title="Excluir"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10" style={{ background: 'rgba(0,0,0,0.02)', borderRadius: '1rem', border: '1px dashed rgba(0,0,0,0.1)' }}>
+                  <List size={40} className="mx-auto mb-3 text-muted opacity-50" />
+                  <p className="text-muted">Nenhuma aula cadastrada ainda.<br/>Comece adicionando a primeira aula acima!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedImage && (
         <div 

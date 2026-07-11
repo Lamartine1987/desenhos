@@ -124,50 +124,24 @@ export default function ProfessorDashboard() {
               <div 
                 key={mod.id} 
                 className="glass-card" 
-                style={{ padding: '1.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+                style={{ 
+                  padding: '1.5rem', cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                  border: pendingCount > 0 ? '1.5px solid rgba(245, 158, 11, 0.6)' : undefined,
+                  boxShadow: pendingCount > 0 ? '0 0 25px rgba(245, 158, 11, 0.35)' : undefined,
+                  transition: 'all 0.3s ease'
+                }}
                 onClick={() => navigate(`/professor/modulo/${mod.id}`)}
               >
-                <div className="flex items-center gap-3 mb-2 justify-between">
-                  <div className="flex items-center gap-3">
-                    <div style={{ background: 'rgba(236, 72, 153, 0.2)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                      <Folder className="text-secondary" size={24} />
+                <div className="flex items-start gap-3 mb-2">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="shrink-0" style={{ 
+                      background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(236, 72, 153, 0.2)', 
+                      padding: '0.75rem', 
+                      borderRadius: '0.75rem' 
+                    }}>
+                      <Folder className={pendingCount > 0 ? "text-warning" : "text-secondary"} size={24} />
                     </div>
                     <h3 className="text-xl font-bold" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.name}</h3>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                     <button
-                       onClick={async (e) => {
-                         e.stopPropagation();
-                         await toggleModuleVisibility(mod.id, mod.hidden);
-                       }}
-                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-                       title={mod.hidden ? "Mostrar para alunos" : "Ocultar dos alunos"}
-                     >
-                       {mod.hidden ? <EyeOff size={20} /> : <Eye size={20} />}
-                     </button>
-                     <button
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         setEditModName(mod.name);
-                         setEditModDesc(mod.description || '');
-                         setModuleToEdit(mod);
-                       }}
-                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-                       title="Editar módulo"
-                     >
-                       <Edit3 size={20} />
-                     </button>
-                     <button
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         setModuleToDelete(mod);
-                       }}
-                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
-                       title="Excluir módulo"
-                     >
-                       <Trash2 size={20} />
-                     </button>
                   </div>
                 </div>
                 <p className="text-muted text-sm mb-6 flex-1 line-clamp-2" style={{ opacity: mod.hidden ? 0.5 : 1 }}>{mod.description}</p>
@@ -185,6 +159,41 @@ export default function ProfessorDashboard() {
                     <span className="text-2xl font-bold">{evaluatedCount}</span>
                     <span className="text-xs uppercase tracking-wider">Avaliados</span>
                   </div>
+                </div>
+
+                <div className="flex justify-end gap-4 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                   <button
+                     onClick={async (e) => {
+                       e.stopPropagation();
+                       await toggleModuleVisibility(mod.id, mod.hidden);
+                     }}
+                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                     title={mod.hidden ? "Mostrar para alunos" : "Ocultar dos alunos"}
+                   >
+                     {mod.hidden ? <EyeOff size={20} /> : <Eye size={20} />}
+                   </button>
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setEditModName(mod.name);
+                       setEditModDesc(mod.description || '');
+                       setModuleToEdit(mod);
+                     }}
+                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                     title="Editar módulo"
+                   >
+                     <Edit3 size={20} />
+                   </button>
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setModuleToDelete(mod);
+                     }}
+                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                     title="Excluir módulo"
+                   >
+                     <Trash2 size={20} />
+                   </button>
                 </div>
               </div>
             );

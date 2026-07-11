@@ -31,12 +31,17 @@ export default function StudentDashboard() {
 
   const visibleModules = modules.filter(m => !m.hidden);
   
-  const completedModulesCount = visibleModules.filter(mod => 
-    studentSubmissions.some(s => s.moduleId === mod.id)
-  ).length;
+  const totalLessonsCount = visibleModules.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0);
   
-  const totalModulesCount = visibleModules.length;
-  const progressPercentage = totalModulesCount > 0 ? Math.round((completedModulesCount / totalModulesCount) * 100) : 0;
+  const completedLessonsSet = new Set();
+  studentSubmissions.forEach(s => {
+    if (s.lessonId) {
+      completedLessonsSet.add(`${s.moduleId}-${s.lessonId}`);
+    }
+  });
+  const completedLessonsCount = completedLessonsSet.size;
+  
+  const progressPercentage = totalLessonsCount > 0 ? Math.round((completedLessonsCount / totalLessonsCount) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -45,12 +50,12 @@ export default function StudentDashboard() {
         <p className="text-muted">Selecione um módulo para enviar o seu desenho.</p>
       </div>
 
-      {totalModulesCount > 0 && (
+      {totalLessonsCount > 0 && (
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '-1rem' }}>
           <div className="flex justify-between items-end mb-3">
             <div>
               <h3 className="font-bold text-lg text-gradient">Seu Progresso no Curso</h3>
-              <p className="text-sm text-muted">{completedModulesCount} de {totalModulesCount} desafios concluídos</p>
+              <p className="text-sm text-muted">{completedLessonsCount} de {totalLessonsCount} tarefas concluídas</p>
             </div>
             <span className="text-3xl font-bold text-primary">{progressPercentage}%</span>
           </div>
@@ -113,7 +118,10 @@ export default function StudentDashboard() {
           <div className="glass-panel p-4" style={{ padding: '1.5rem' }}>
               <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
                 {studentSubmissions.slice(0, displayLimit).map(sub => {
-                  const modName = modules.find(m => m.id === sub.moduleId)?.name;
+                  const mod = modules.find(m => m.id === sub.moduleId);
+                  const lesson = mod?.lessons?.find(l => l.id === sub.lessonId);
+                  const modName = mod?.name || 'Módulo Desconhecido';
+                  const lessonName = lesson?.title || '';
                   return (
                     <div 
                       key={sub.id} 
@@ -155,7 +163,8 @@ export default function StudentDashboard() {
                          </button>
                        )}
                        <div style={{ padding: '0.75rem' }}>
-                          <p className="text-sm font-bold truncate" title={modName}>{modName}</p>
+                          <p className="text-xs text-muted truncate mb-1" title={modName}>{modName}</p>
+                          <p className="text-sm font-bold truncate" title={lessonName}>{lessonName || 'Desenho'}</p>
                           <div className="mt-2">
                             <span className={`badge ${sub.status === 'evaluated' ? 'badge-evaluated' : 'badge-pending'}`} style={{ fontSize: '0.65rem' }}>
                               {sub.status === 'evaluated' ? 'Avaliado' : 'Pendente'}
@@ -181,17 +190,17 @@ export default function StudentDashboard() {
         <div 
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.85)', zIndex: 100,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem',
+            background: 'rgba(0,0,0,0.85)', zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
             cursor: 'pointer'
           }}
           onClick={() => setSelectedImage(null)}
         >
-          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%', display: 'inline-block' }}>
+          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '90vh', display: 'flex', justifyContent: 'center' }}>
             <img 
               src={selectedImage.original} 
               alt="Desenho em tamanho real" 
-              style={{ maxWidth: '100%', maxHeight: '100vh', objectFit: 'contain', borderRadius: '0.5rem' }} 
+              style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '0.5rem' }} 
             />
             {selectedImage.evaluated && (
               <img 

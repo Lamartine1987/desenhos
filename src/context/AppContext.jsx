@@ -177,11 +177,48 @@ export const AppProvider = ({ children }) => {
     await addDoc(collection(db, 'modules'), {
       name,
       description,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      lessons: []
     });
   };
 
-  const addSubmission = async (moduleId, fileObj) => {
+  const addLesson = async (moduleId, title) => {
+    try {
+      const module = modules.find(m => m.id === moduleId);
+      if (!module) return;
+      const newLesson = { id: Date.now().toString(), title };
+      const updatedLessons = [...(module.lessons || []), newLesson];
+      await updateDoc(doc(db, 'modules', moduleId), { lessons: updatedLessons });
+    } catch (error) {
+      console.error("Error adding lesson:", error);
+    }
+  };
+
+  const editLesson = async (moduleId, lessonId, newTitle) => {
+    try {
+      const module = modules.find(m => m.id === moduleId);
+      if (!module) return;
+      const updatedLessons = (module.lessons || []).map(l => 
+        l.id === lessonId ? { ...l, title: newTitle } : l
+      );
+      await updateDoc(doc(db, 'modules', moduleId), { lessons: updatedLessons });
+    } catch (error) {
+      console.error("Error editing lesson:", error);
+    }
+  };
+
+  const deleteLesson = async (moduleId, lessonId) => {
+    try {
+      const module = modules.find(m => m.id === moduleId);
+      if (!module) return;
+      const updatedLessons = (module.lessons || []).filter(l => l.id !== lessonId);
+      await updateDoc(doc(db, 'modules', moduleId), { lessons: updatedLessons });
+    } catch (error) {
+      console.error("Error deleting lesson:", error);
+    }
+  };
+
+  const addSubmission = async (moduleId, fileObj, lessonId = null, lessonTitle = null) => {
     if (!user) return;
     try {
       const moduleName = modules.find(m => m.id === moduleId)?.name.replace(/[^a-zA-Z0-9]/g, '_') || 'Modulo';
@@ -208,6 +245,8 @@ export const AppProvider = ({ children }) => {
       // Save to Firestore
       await addDoc(collection(db, 'submissions'), {
         moduleId,
+        lessonId,
+        lessonTitle,
         studentId: user.id,
         studentName: user.name,
         imageUrl,
@@ -360,7 +399,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       user, login, registerUser, logout, resetPassword, loading,
-      modules, addModule, deleteModule, editModule, toggleModuleVisibility,
+      modules, addModule, deleteModule, editModule, toggleModuleVisibility, addLesson, editLesson, deleteLesson,
       submissions, addSubmission, markEvaluated, saveEvaluation, deleteSubmission,
       fetchUsers, updateUserRole, toggleUserBlock, updateUserProfile
     }}>

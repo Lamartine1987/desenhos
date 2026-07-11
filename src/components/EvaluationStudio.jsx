@@ -190,7 +190,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
     >
       {/* Header Toolbar */}
       <div 
-        className="flex justify-between items-center px-4"
+        className="flex justify-between items-center px-4 pr-6 sm:pr-8"
         style={{ 
           backgroundColor: '#18181b', 
           borderBottom: '1px solid #27272a',
@@ -333,21 +333,16 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
           >
             <TransformComponent 
               wrapperStyle={{ width: '100%', height: '100%' }}
-              contentStyle={{ width: '100%', height: '100%', position: 'relative' }}
+              contentStyle={{ width: 'max-content', height: 'max-content' }}
             >
               <div style={{ 
-                position: 'absolute', 
-                top: '50%', 
-                left: '50%', 
-                transform: 'translate(-50%, -50%)', 
-                maxWidth: '100%', 
-                maxHeight: '100%', 
-                display: 'inline-block' 
+                position: 'relative', 
+                display: 'inline-block'
               }}>
                 <img 
                   src={imageObj.src} 
                   alt="Fundo" 
-                  style={{ maxWidth: '100%', maxHeight: '100%', display: 'block', pointerEvents: 'none' }} 
+                  style={{ maxWidth: '100vw', maxHeight: '85vh', display: 'block', pointerEvents: 'none' }} 
                 />
                 <canvas
                     ref={canvasRef}
