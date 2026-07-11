@@ -25,6 +25,7 @@ export default function ProfessorSubmissions() {
   const [evaluatingSubmission, setEvaluatingSubmission] = useState(null);
   const [moduleSubmissions, setModuleSubmissions] = useState([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
+  const [alertMessage, setAlertMessage] = useState('');
   
   // Pagination state
   const [displayCount, setDisplayCount] = useState(20);
@@ -155,16 +156,16 @@ export default function ProfessorSubmissions() {
         Voltar
       </button>
 
-      <div className="flex justify-between items-center mobile-col gap-4">
-        <div className="mobile-w-full">
+      <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6 mb-8 mt-2">
+        <div className="xl:w-1/3">
           <h2 className="text-3xl font-bold text-gradient mb-2">{module.name}</h2>
           <p className="text-muted">Avaliando artes dos alunos.</p>
         </div>
         
-        <div className="flex mobile-col gap-4 mobile-w-full">
+        <div className="flex flex-wrap gap-4 w-full xl:w-auto xl:flex-1 xl:justify-end">
           <select 
-            className="input-field flex-1" 
-            style={{ width: 'auto', padding: '0.6rem 2.5rem 0.6rem 1rem' }}
+            className="input-field flex-1 min-w-[180px]" 
+            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0 }}
             value={lessonFilter}
             onChange={(e) => setLessonFilter(e.target.value)}
           >
@@ -175,8 +176,8 @@ export default function ProfessorSubmissions() {
           </select>
 
           <select 
-            className="input-field flex-1" 
-            style={{ width: 'auto', padding: '0.6rem 2.5rem 0.6rem 1rem' }}
+            className="input-field flex-1 min-w-[180px]" 
+            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0 }}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -185,12 +186,12 @@ export default function ProfessorSubmissions() {
             <option value="evaluated">Já Avaliadas</option>
           </select>
 
-          <button className="btn btn-outline flex-1" onClick={() => setShowLessonModal(true)}>
+          <button className="btn btn-outline flex-1 min-w-[180px]" onClick={() => setShowLessonModal(true)}>
             <List size={20} />
             Gerenciar Aulas
           </button>
 
-          <button className="btn btn-primary flex-1" onClick={handleDownloadAll} disabled={filteredSubmissions.length === 0}>
+          <button className="btn btn-primary flex-1 min-w-[180px]" onClick={handleDownloadAll} disabled={filteredSubmissions.length === 0}>
             <DownloadCloud size={20} />
             Baixar .zip ({filteredSubmissions.length})
           </button>
@@ -444,10 +445,30 @@ export default function ProfessorSubmissions() {
               ));
               setEvaluatingSubmission(null);
             } else {
-              alert(result.error); // Fallback error handling
+              setAlertMessage(result.error);
             }
           }}
         />
+      )}
+
+      {/* Modal de Alerta Moderno */}
+      {alertMessage && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+            zIndex: 100
+          }}
+        >
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '400px', position: 'relative', background: 'white', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--main)' }}>Aviso</h3>
+            <p className="text-muted" style={{ marginBottom: '24px', lineHeight: '1.5' }}>{alertMessage}</p>
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAlertMessage('')}>
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

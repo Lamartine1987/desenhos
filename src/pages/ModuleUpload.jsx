@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { UploadCloud, CheckCircle, ArrowLeft, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, CheckCircle, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 export default function ModuleUpload() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { modules, addSubmission, user, submissions } = useAppContext();
+  const { modules, addSubmission, user, submissions, deleteSubmission } = useAppContext();
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -14,6 +14,7 @@ export default function ModuleUpload() {
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
   
   const fileInputRef = useRef(null);
   
@@ -123,7 +124,9 @@ export default function ModuleUpload() {
     setIsUploading(false);
     
     if (result && result.success) {
-      navigate('/aluno');
+      setFile(null);
+      setPreview(null);
+      setSelectedLesson(null);
     } else if (result) {
       setErrorMsg(result.error);
     }
@@ -368,6 +371,23 @@ export default function ModuleUpload() {
                                  <span className="text-sm text-muted">
                                     {new Date(sub.timestamp).toLocaleDateString('pt-BR')}
                                  </span>
+                                 {sub.status === 'pending' && (
+                                   <button 
+                                     onClick={() => {
+                                       setConfirmAction({
+                                         title: 'Excluir Envio',
+                                         message: 'Tem certeza que deseja excluir este envio? Essa ação não pode ser desfeita.',
+                                         onConfirm: () => deleteSubmission(sub.id)
+                                       });
+                                     }}
+                                     className="btn ml-auto flex items-center gap-2 text-sm transition-colors"
+                                     style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '0.4rem 0.8rem' }}
+                                     title="Excluir envio"
+                                   >
+                                     <Trash2 size={16} />
+                                     <span className="hidden sm:inline font-semibold">Excluir</span>
+                                   </button>
+                                 )}
                                </div>
                                {sub.status === 'evaluated' && (
                                   <p className="text-sm text-zinc-600 bg-zinc-50 p-3 rounded-lg border border-zinc-100 mb-3">
@@ -435,6 +455,38 @@ export default function ModuleUpload() {
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', borderRadius: '0.5rem', pointerEvents: 'none' }} 
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação Moderno */}
+      {confirmAction && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+            zIndex: 100
+          }}
+        >
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '400px', position: 'relative', background: 'white' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--main)' }}>{confirmAction.title}</h3>
+            <p className="text-muted" style={{ marginBottom: '24px', lineHeight: '1.5' }}>{confirmAction.message}</p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmAction(null)}>
+                Cancelar
+              </button>
+              <button 
+                className="btn" 
+                style={{ flex: 1, justifyContent: 'center', background: 'var(--danger)', color: 'white', border: 'none' }}
+                onClick={() => {
+                  confirmAction.onConfirm();
+                  setConfirmAction(null);
+                }}
+              >
+                Sim, Excluir
+              </button>
+            </div>
           </div>
         </div>
       )}

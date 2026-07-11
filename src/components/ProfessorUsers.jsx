@@ -7,6 +7,7 @@ export default function ProfessorUsers() {
   const [usersList, setUsersList] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [alertMessage, setAlertMessage] = useState('');
 
   useEffect(() => {
     loadUsers();
@@ -27,7 +28,7 @@ export default function ProfessorUsers() {
     if (result.success) {
       setUsersList(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } else {
-      alert(result.error);
+      setAlertMessage(result.error);
     }
   };
 
@@ -39,7 +40,7 @@ export default function ProfessorUsers() {
       const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
       setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
     } else {
-      alert(result.error);
+      setAlertMessage(result.error);
     }
   };
 
@@ -147,6 +148,26 @@ export default function ProfessorUsers() {
           </table>
         </div>
       </div>
+
+      {/* Modal de Alerta Moderno */}
+      {alertMessage && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+            zIndex: 100
+          }}
+        >
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '400px', position: 'relative', background: 'white', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '12px', color: 'var(--main)' }}>Aviso</h3>
+            <p className="text-muted" style={{ marginBottom: '24px', lineHeight: '1.5' }}>{alertMessage}</p>
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAlertMessage('')}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

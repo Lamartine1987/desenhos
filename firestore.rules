@@ -46,8 +46,11 @@ service cloud.firestore {
       // Criação: O aluno pode criar o envio, mas garantimos que o studentId salvo é realmente o UID dele.
       allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
       
-      // Atualização e Exclusão: Apenas o professor pode fazer isso (para dar notas ou excluir envios).
-      allow update, delete: if isProfessor();
+      // Atualização: Apenas o professor pode fazer isso (para dar notas).
+      allow update: if isProfessor();
+      
+      // Exclusão: Professor pode excluir. Aluno pode excluir apenas seus próprios envios com status 'pending'.
+      allow delete: if isProfessor() || (isAuth() && resource.data.studentId == request.auth.uid && resource.data.status == 'pending');
     }
   }
 }

@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, storage, auth } from '../firebase';
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, where, getDocs, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import imageCompression from 'browser-image-compression';
 
 const AppContext = createContext();
@@ -123,11 +123,22 @@ export const AppProvider = ({ children }) => {
       
       console.log("Usuário criado no auth com UID:", userCredential.user.uid);
       
+      let ip = 'Desconhecido';
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        ip = data.ip;
+      } catch (e) {
+        console.error('Erro ao obter IP:', e);
+      }
+
       const newUser = {
         name,
         phone,
         email,
-        role: 'student'
+        role: 'student',
+        lgpdAcceptedAt: new Date().toISOString(),
+        registrationIp: ip
       };
       
       // Save extra data in Firestore using the auth UID
@@ -170,6 +181,52 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       console.error("Reset password error: ", error);
       return { success: false, error: 'Erro ao enviar e-mail de recuperação. Verifique o e-mail digitado.' };
+    }
+  };
+
+  const deleteAccount = async (password) => {
+    if (!auth.currentUser || !user) return { success: false, error: 'Usuário não autenticado.' };
+    
+    try {
+      // 1. Reautenticar para poder deletar a conta
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // 2. Apagar todas as submissões e imagens do Storage
+      const subsQuery = query(collection(db, 'submissions'), where('studentId', '==', user.id));
+      const subsSnapshot = await getDocs(subsQuery);
+      
+      for (const docSnap of subsSnapshot.docs) {
+        const subData = docSnap.data();
+        // Tentar apagar do Storage se houver imagem
+        if (subData.imageUrl) {
+          try {
+            const imageRef = ref(storage, subData.imageUrl);
+            await deleteObject(imageRef);
+          } catch (e) {
+            console.error("Erro ao deletar imagem do storage", e);
+          }
+        }
+        // Deletar o documento do Firestore
+        await deleteDoc(docSnap.ref);
+      }
+
+      // 3. Apagar o documento do usuário
+      await deleteDoc(doc(db, 'users', user.id));
+
+      // 4. Apagar o usuário do Firebase Auth
+      await deleteUser(auth.currentUser);
+
+      // 5. Limpar estado local
+      setUser(null);
+      
+      return { success: true };
+    } catch (error) {
+      console.error("Erro ao excluir conta:", error);
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        return { success: false, error: 'Senha incorreta.' };
+      }
+      return { success: false, error: 'Ocorreu um erro ao excluir sua conta.' };
     }
   };
 
@@ -398,7 +455,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
-      user, login, registerUser, logout, resetPassword, loading,
+      user, login, registerUser, logout, resetPassword, loading, deleteAccount,
       modules, addModule, deleteModule, editModule, toggleModuleVisibility, addLesson, editLesson, deleteLesson,
       submissions, addSubmission, markEvaluated, saveEvaluation, deleteSubmission,
       fetchUsers, updateUserRole, toggleUserBlock, updateUserProfile

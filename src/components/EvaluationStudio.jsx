@@ -28,6 +28,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
   // Load the image
   useEffect(() => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     
     let fetchUrl = submission.imageUrl;
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { LogIn, UserPlus, Info } from 'lucide-react';
+import { LogIn, UserPlus, Info, FileText, X } from 'lucide-react';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -15,6 +15,10 @@ export default function Login() {
   const { login, registerUser, resetPassword, user } = useAppContext();
   const navigate = useNavigate();
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [modalType, setModalType] = useState('terms');
 
   React.useEffect(() => {
     if (user) {
@@ -32,6 +36,10 @@ export default function Login() {
     
     if (isRegistering) {
       if (!name || !email || !phone || !password) return;
+      if (!acceptedTerms || !acceptedPrivacy) {
+        setErrorMsg('Você precisa aceitar os Termos de Uso e a Política de Privacidade (LGPD) para se cadastrar.');
+        return;
+      }
       const result = await registerUser(name, email, phone, password);
       if (result && result.success) {
         navigate('/aluno');
@@ -166,7 +174,39 @@ export default function Login() {
             </div>
           )}
           
-          {isRegistering && <div className="mb-6"></div>}
+          {isRegistering && (
+            <div className="mb-6 flex flex-col gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-200">
+              <div className="flex items-start gap-3">
+                <input 
+                  type="checkbox" 
+                  id="terms" 
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1"
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  required
+                />
+                <label htmlFor="terms" className="text-sm text-muted leading-relaxed cursor-pointer select-none">
+                  Li e concordo com os <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModalType('terms'); setShowTermsModal(true); }} className="text-primary hover:underline" style={{background:'none', border:'none', padding:0, cursor:'pointer', fontWeight: '600'}}>Termos de Uso</button>.
+                </label>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <input 
+                  type="checkbox" 
+                  id="privacy" 
+                  checked={acceptedPrivacy}
+                  onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                  className="mt-1"
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  required
+                />
+                <label htmlFor="privacy" className="text-sm text-muted leading-relaxed cursor-pointer select-none">
+                  Li e concordo com a <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModalType('privacy'); setShowTermsModal(true); }} className="text-primary hover:underline" style={{background:'none', border:'none', padding:0, cursor:'pointer', fontWeight: '600'}}>Política de Privacidade (LGPD)</button>.
+                </label>
+              </div>
+            </div>
+          )}
 
 
 
@@ -185,6 +225,9 @@ export default function Login() {
               setName('');
               setPassword('');
               setPhone('');
+              setAcceptedTerms(false);
+              setAcceptedPrivacy(false);
+              setErrorMsg('');
             }}
           >
             {isRegistering ? 'Já tenho uma conta. Fazer login' : 'Não tem conta? Cadastre-se'}
@@ -261,6 +304,148 @@ export default function Login() {
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showTermsModal && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+            zIndex: 100
+          }}
+        >
+          <div className="glass-panel flex flex-col" style={{ width: '100%', maxWidth: '700px', maxHeight: '85vh', position: 'relative', overflow: 'hidden' }}>
+            <div className="flex justify-between items-center" style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div className="flex items-center gap-2">
+                <FileText className="text-primary" size={24} />
+                <h3 className="text-xl font-bold">{modalType === 'terms' ? 'Termos de Uso' : 'Política de Privacidade (LGPD)'}</h3>
+              </div>
+              <button 
+                onClick={() => setShowTermsModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ padding: '1.5rem', fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: '1.6', overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
+              {modalType === 'terms' ? (
+                <>
+                  <div className="mb-6">
+                    <p><strong>ArtReview</strong></p>
+                    <p><strong>Versão:</strong> 1.0</p>
+                    <p><strong>Data de Vigência:</strong> 11 de julho de 2026</p>
+                    <p className="text-sm text-primary mt-1"><em>Observação: personalize os campos entre colchetes antes da publicação.</em></p>
+                  </div>
+
+                  <h4 className="font-bold text-main mb-2">1. Apresentação</h4>
+                  <p className="mb-4">A ArtReview é uma plataforma desenvolvida pela LamaTech para apoiar professores na gestão de avaliações de desenhos enviados por seus alunos.</p>
+                  <p className="mb-6">A plataforma permite o cadastro de usuários, envio de desenhos, acompanhamento das avaliações e organização das atividades do curso. Os vídeos de correção são gravados e publicados diretamente pelo professor em plataforma de sua escolha. A ArtReview não hospeda esses vídeos nem realiza integração automática com plataformas de terceiros.</p>
+
+                  <h4 className="font-bold text-main mb-2">2. Aceitação dos Termos</h4>
+                  <p className="mb-6">Ao criar uma conta e utilizar a ArtReview, o usuário declara que leu, compreendeu e concorda com estes Termos de Uso e com a Política de Privacidade.</p>
+
+                  <h4 className="font-bold text-main mb-2">3. Cadastro e Conta</h4>
+                  <p className="mb-6">O usuário deverá fornecer nome, e-mail, telefone e criar uma senha. É responsável pela veracidade das informações e pelo sigilo de suas credenciais de acesso.</p>
+
+                  <h4 className="font-bold text-main mb-2">4. Utilização da Plataforma</h4>
+                  <p className="mb-6">O usuário compromete-se a utilizar a plataforma de forma ética e conforme a legislação, abstendo-se de praticar atos ilícitos, tentar obter acesso indevido, enviar arquivos maliciosos ou violar direitos de terceiros.</p>
+
+                  <h4 className="font-bold text-main mb-2">5. Envio de Desenhos</h4>
+                  <p className="mb-4">O aluno declara ser titular dos direitos sobre os desenhos enviados ou possuir autorização para utilizá-los.</p>
+                  <p className="mb-6">Conteúdos ilícitos ou que violem direitos de terceiros poderão ser removidos.</p>
+
+                  <h4 className="font-bold text-main mb-2">6. Direitos Autorais</h4>
+                  <p className="mb-4">Os desenhos permanecem de propriedade do aluno.</p>
+                  <p className="mb-4">Ao enviar um desenho, o aluno concede ao professor responsável e à ArtReview licença limitada, gratuita e não exclusiva para armazenar, visualizar e utilizar o material exclusivamente para fins de avaliação pedagógica e funcionamento da plataforma.</p>
+                  <p className="mb-6">A LamaTech não utilizará os desenhos para fins comerciais ou publicitários.</p>
+
+                  <h4 className="font-bold text-main mb-2">7. Responsabilidades</h4>
+                  <ul className="mb-6 list-disc pl-5">
+                    <li className="mb-2"><strong>Do aluno:</strong> manter dados atualizados, preservar a segurança da conta e respeitar estes Termos.</li>
+                    <li className="mb-2"><strong>Do professor:</strong> conduzir as avaliações, administrar o curso e publicar os vídeos de correção em ambiente externo.</li>
+                    <li><strong>Da LamaTech:</strong> disponibilizar e manter a plataforma, atuando apenas como operadora da tecnologia.</li>
+                  </ul>
+
+                  <h4 className="font-bold text-main mb-2">8. Disponibilidade</h4>
+                  <p className="mb-6">A plataforma poderá ficar temporariamente indisponível para manutenção, atualização ou por motivos alheios ao controle da LamaTech.</p>
+
+                  <h4 className="font-bold text-main mb-2">9. Suspensão da Conta</h4>
+                  <p className="mb-6">Contas poderão ser suspensas em caso de fraude, uso indevido, tentativa de invasão ou violação destes Termos.</p>
+
+                  <h4 className="font-bold text-main mb-2">10. Alterações</h4>
+                  <p className="mb-6">Os Termos poderão ser atualizados. Alterações relevantes poderão exigir novo aceite do usuário.</p>
+
+                  <h4 className="font-bold text-main mb-2">11. Lei Aplicável</h4>
+                  <p className="mb-6">Este documento é regido de acordo com a legislação brasileira.</p>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <p><strong>ArtReview</strong></p>
+                    <p><strong>Versão:</strong> 1.0</p>
+                    <p><strong>Data de Vigência:</strong> 11 de julho de 2026</p>
+                  </div>
+
+                  <h4 className="font-bold text-main mb-2">1. Introdução</h4>
+                  <p className="mb-6">Esta Política de Privacidade explica como os dados pessoais são tratados na ArtReview em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
+
+                  <h4 className="font-bold text-main mb-2">2. Papéis no Tratamento</h4>
+                  <ul className="mb-6 list-disc pl-5">
+                    <li className="mb-2"><strong>Controlador:</strong> Professor responsável pelo curso, que define as finalidades e os meios do tratamento dos dados.</li>
+                    <li><strong>Operadora:</strong> LamaTech, responsável por disponibilizar e manter a plataforma, tratando os dados conforme as instruções do controlador.</li>
+                  </ul>
+
+                  <h4 className="font-bold text-main mb-2">3. Dados Coletados</h4>
+                  <p className="mb-6">São coletados dados cadastrais (nome, e-mail e telefone), dados de autenticação, registros técnicos necessários ao funcionamento da plataforma e os desenhos enviados para avaliação.</p>
+
+                  <h4 className="font-bold text-main mb-2">4. Finalidades</h4>
+                  <p className="mb-6">Os dados são utilizados para identificação do aluno, autenticação, prestação dos serviços, organização das avaliações, suporte técnico, segurança da plataforma e cumprimento de obrigações legais.</p>
+
+                  <h4 className="font-bold text-main mb-2">5. Bases Legais</h4>
+                  <p className="mb-6">O tratamento poderá ocorrer com fundamento na execução de contrato, legítimo interesse, cumprimento de obrigação legal, exercício regular de direitos e outras bases previstas na LGPD, conforme o caso.</p>
+
+                  <h4 className="font-bold text-main mb-2">6. Compartilhamento</h4>
+                  <p className="mb-4">Os dados não são vendidos.</p>
+                  <p className="mb-4">O acesso é restrito ao professor (controlador) e à LamaTech (operadora), quando necessário para prestação do serviço.</p>
+                  <p className="mb-6">A ArtReview não compartilha automaticamente dados com nenhuma outra plataforma.</p>
+
+                  <h4 className="font-bold text-main mb-2">7. Armazenamento e Segurança</h4>
+                  <p className="mb-6">Os dados são armazenados em infraestrutura do Google Firebase, com medidas técnicas e administrativas destinadas à proteção das informações contra acessos não autorizados.</p>
+
+                  <h4 className="font-bold text-main mb-2">8. Retenção</h4>
+                  <p className="mb-6">Os dados permanecerão armazenados pelo período necessário à prestação do serviço, cumprimento de obrigações legais ou exercício regular de direitos.</p>
+
+                  <h4 className="font-bold text-main mb-2">9. Direitos do Titular</h4>
+                  <p className="mb-6">O titular poderá solicitar acesso, correção, atualização, eliminação quando cabível, portabilidade, informações sobre o tratamento e demais direitos previstos na LGPD, entrando em contato com o controlador.</p>
+
+                  <h4 className="font-bold text-main mb-2">10. Contato</h4>
+                  <p className="mb-2"><strong>Controlador:</strong> [Nome do Professor]</p>
+                  <p className="mb-4"><strong>E-mail:</strong> [E-mail]</p>
+                  <p className="mb-2"><strong>Operadora:</strong> LamaTech</p>
+                  <p className="mb-6"><strong>E-mail:</strong> lamatechdesenhos@gmail.com</p>
+
+                  <h4 className="font-bold text-main mb-2">11. Atualizações</h4>
+                  <p className="mb-6">Esta Política poderá ser alterada para refletir mudanças legais ou operacionais. A versão vigente permanecerá disponível na plataforma.</p>
+                </>
+              )}
+            </div>
+
+            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-dark)', display: 'flex', justifyContent: 'flex-end', borderBottomLeftRadius: 'var(--radius-lg)', borderBottomRightRadius: 'var(--radius-lg)' }}>
+              <button className="btn btn-primary" onClick={() => {
+                if (modalType === 'terms') {
+                  setAcceptedTerms(true);
+                } else {
+                  setAcceptedPrivacy(true);
+                }
+                setShowTermsModal(false);
+              }}>
+                Li e Concordo
+              </button>
+            </div>
           </div>
         </div>
       )}
