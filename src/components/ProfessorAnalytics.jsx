@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { BarChart3, Users, CheckCircle, Image as ImageIcon, Trophy } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function ProfessorAnalytics() {
-  const { submissions, fetchUsers } = useAppContext();
+  const { fetchUsers } = useAppContext();
   const [studentsCount, setStudentsCount] = useState(0);
+  const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,6 +19,15 @@ export default function ProfessorAnalytics() {
     const users = await fetchUsers();
     const students = users.filter(u => u.role === 'student');
     setStudentsCount(students.length);
+
+    try {
+      const snap = await getDocs(collection(db, 'submissions'));
+      const data = snap.docs.map(d => d.data());
+      setSubmissions(data);
+    } catch (err) {
+      console.error("Error fetching submissions for analytics", err);
+    }
+
     setLoading(false);
   };
 

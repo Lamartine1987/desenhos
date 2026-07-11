@@ -5,25 +5,68 @@ import { ArrowLeft, Download, CheckCircle, DownloadCloud, Image as ImageIcon } f
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import EvaluationStudio from '../components/EvaluationStudio';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useInView } from 'react-intersection-observer';
 
 export default function ProfessorSubmissions() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { modules, submissions, markEvaluated, saveEvaluation, user } = useAppContext();
+  const { modules, saveEvaluation, user } = useAppContext();
   
-  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'evaluated'
+  const [filter, setFilter] = useState('pending'); // 'all', 'pending', 'evaluated'
   const [selectedImage, setSelectedImage] = useState(null);
   const [evaluatingSubmission, setEvaluatingSubmission] = useState(null);
+  const [moduleSubmissions, setModuleSubmissions] = useState([]);
+  const [loadingSubs, setLoadingSubs] = useState(true);
+  
+  // Pagination state
+  const [displayCount, setDisplayCount] = useState(20);
+  const { ref: observerRef, inView } = useInView();
+
+  React.useEffect(() => {
+    if (inView) {
+      setDisplayCount(prev => prev + 20);
+    }
+  }, [inView]);
+
+  React.useEffect(() => {
+    const fetchModSubs = async () => {
+      setLoadingSubs(true);
+      try {
+        const q = query(collection(db, 'submissions'), where('moduleId', '==', id));
+        const snap = await getDocs(q);
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // sort by timestamp descending
+        data.sort((a, b) => b.timestamp - a.timestamp);
+        setModuleSubmissions(data);
+      } catch (err) {
+        console.error("Error fetching module submissions", err);
+      }
+      setLoadingSubs(false);
+    };
+    if (user && user.role === 'professor') {
+      fetchModSubs();
+    }
+  }, [id, user]);
 
   if (!user || user.role !== 'professor') return <div>Acesso negado</div>;
 
   const module = modules.find(m => m.id === id);
   if (!module) return <div>Módulo não encontrado</div>;
 
-  const moduleSubmissions = submissions
-    .filter(s => s.moduleId === id)
+  const filteredSubmissions = moduleSubmissions
     .filter(s => filter === 'all' ? true : s.status === filter)
-    .sort((a, b) => b.timestamp - a.timestamp); // latest first
+    .sort((a, b) => {
+      if (filter === 'evaluated') {
+        const timeA = a.evaluationTimestamp || a.timestamp || 0;
+        const timeB = b.evaluationTimestamp || b.timestamp || 0;
+        return timeB - timeA;
+      }
+      return b.timestamp - a.timestamp;
+    });
+  
+  const displayedSubmissions = filteredSubmissions.slice(0, displayCount);
 
   const handleDownloadSingle = async (sub) => {
     try {
@@ -113,7 +156,10 @@ export default function ProfessorSubmissions() {
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
-        {moduleSubmissions.map(sub => (
+        {loadingSubs ? (
+          <div className="col-span-full py-12 text-center text-muted">Carregando desenhos...</div>
+        ) : (
+          displayedSubmissions.map(sub => (
           <div key={sub.id} className="glass-card flex flex-col overflow-hidden">
             <div 
               style={{ position: 'relative', height: '250px', backgroundColor: 'rgba(0,0,0,0.05)', cursor: 'pointer' }}
@@ -123,12 +169,14 @@ export default function ProfessorSubmissions() {
               <img 
                 src={sub.imageUrl} 
                 alt="Arte do Aluno" 
+                loading="lazy"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
               />
               {sub.evaluatedImageUrl && (
                 <img 
                   src={sub.evaluatedImageUrl} 
                   alt="Correção do Professor" 
+                  loading="lazy"
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} 
                 />
               )}
@@ -180,9 +228,17 @@ export default function ProfessorSubmissions() {
               </div>
             </div>
           </div>
-        ))}
+        ))
+      )}
 
-        {moduleSubmissions.length === 0 && (
+        {/* Observer Target for Infinite Scroll */}
+        {!loadingSubs && displayedSubmissions.length < filteredSubmissions.length && (
+          <div ref={observerRef} className="col-span-full py-8 text-center text-muted">
+            Carregando mais desenhos...
+          </div>
+        )}
+
+        {!loadingSubs && filteredSubmissions.length === 0 && (
           <div className="col-span-full py-16 text-center glass-panel flex flex-col items-center justify-center gap-4" style={{ background: 'rgba(255,255,255,0.02)', borderStyle: 'dashed', borderWidth: '2px' }}>
             <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1.5rem', borderRadius: '50%' }}>
               <ImageIcon size={48} className="text-primary opacity-80" />
@@ -233,6 +289,12 @@ export default function ProfessorSubmissions() {
           onSave={async (file) => {
             const result = await saveEvaluation(evaluatingSubmission.id, file);
             if (result.success) {
+              // Update local state to remove it from pending immediately
+              setModuleSubmissions(prev => prev.map(s => 
+                s.id === evaluatingSubmission.id 
+                  ? { ...s, status: 'evaluated', evaluatedImageUrl: 'saved' } 
+                  : s
+              ));
               setEvaluatingSubmission(null);
             } else {
               alert(result.error); // Fallback error handling

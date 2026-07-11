@@ -3,6 +3,7 @@ import { db, storage, auth } from '../firebase';
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, where, getDocs, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import imageCompression from 'browser-image-compression';
 
 const AppContext = createContext();
 
@@ -30,18 +31,20 @@ export const AppProvider = ({ children }) => {
 
     // Listen to Submissions
     let subQuery;
-    if (user.role === 'professor') {
-      subQuery = collection(db, 'submissions'); // Professors can read all
-    } else {
-      subQuery = query(collection(db, 'submissions'), where('studentId', '==', user.id)); // Students read their own
-    }
+    let unsubSubmissions = () => {};
 
-    const unsubSubmissions = onSnapshot(subQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSubmissions(data.sort((a, b) => b.timestamp - a.timestamp));
-    }, (error) => {
-      console.error("Error listening to submissions: ", error);
-    });
+    if (user.role === 'student') {
+      subQuery = query(collection(db, 'submissions'), where('studentId', '==', user.id));
+      unsubSubmissions = onSnapshot(subQuery, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setSubmissions(data.sort((a, b) => b.timestamp - a.timestamp));
+      }, (error) => {
+        console.error("Error listening to submissions: ", error);
+      });
+    } else {
+      // Professor: We don't fetch all submissions globally anymore to save reads!
+      setSubmissions([]);
+    }
 
     return () => {
       unsubModules();
@@ -50,22 +53,38 @@ export const AppProvider = ({ children }) => {
   }, [user]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubUserDoc = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch user data from firestore
+        // Fetch user data from firestore using onSnapshot for real-time updates
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUser({ id: firebaseUser.uid, email: firebaseUser.email, ...userDoc.data() });
-        } else {
-          setUser(null);
-        }
+        
+        unsubUserDoc = onSnapshot(userDocRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            if (userData.status === 'blocked') {
+              await signOut(auth);
+              setUser(null);
+            } else {
+              setUser({ id: firebaseUser.uid, email: firebaseUser.email, ...userData });
+            }
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
+        });
       } else {
         setUser(null);
+        setLoading(false);
+        if (unsubUserDoc) unsubUserDoc();
       }
-      setLoading(false);
     });
-    return unsub;
+
+    return () => {
+      unsubAuth();
+      if (unsubUserDoc) unsubUserDoc();
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -75,7 +94,12 @@ export const AppProvider = ({ children }) => {
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
-        const loggedUser = { id: userCredential.user.uid, email: userCredential.user.email, ...userDoc.data() };
+        const userData = userDoc.data();
+        if (userData.status === 'blocked') {
+          await signOut(auth);
+          return { success: false, error: 'Sua conta foi bloqueada pelo administrador.' };
+        }
+        const loggedUser = { id: userCredential.user.uid, email: userCredential.user.email, ...userData };
         setUser(loggedUser);
         return { success: true, user: loggedUser };
       } else {
@@ -168,7 +192,17 @@ export const AppProvider = ({ children }) => {
       const metadata = {
         contentDisposition: `attachment; filename="${filename}"`
       };
-      await uploadBytes(storageRef, fileObj, metadata);
+
+      // Compress image before upload
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.85
+      };
+      const compressedFile = await imageCompression(fileObj, options);
+
+      await uploadBytes(storageRef, compressedFile, metadata);
       const imageUrl = await getDownloadURL(storageRef);
 
       // Save to Firestore
@@ -201,7 +235,8 @@ export const AppProvider = ({ children }) => {
       const subRef = doc(db, 'submissions', submissionId);
       await updateDoc(subRef, { 
         status: 'evaluated',
-        evaluatedImageUrl 
+        evaluatedImageUrl,
+        evaluationTimestamp: Date.now()
       });
       return { success: true };
     } catch (error) {
@@ -227,6 +262,19 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       console.error("Error deleting module: ", error);
       return { success: false, error: 'Erro ao excluir módulo.' };
+    }
+  };
+
+  const editModule = async (moduleId, newName, newDescription) => {
+    try {
+      await updateDoc(doc(db, 'modules', moduleId), {
+        name: newName,
+        description: newDescription
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error editing module: ", error);
+      return { success: false, error: 'Erro ao editar módulo.' };
     }
   };
 
@@ -257,6 +305,17 @@ export const AppProvider = ({ children }) => {
     } catch (error) {
       console.error("Error updating user role: ", error);
       return { success: false, error: 'Erro ao atualizar permissão.' };
+    }
+  };
+
+  const toggleUserBlock = async (userId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
+      await updateDoc(doc(db, 'users', userId), { status: newStatus });
+      return { success: true };
+    } catch (error) {
+      console.error("Error toggling user block status: ", error);
+      return { success: false, error: 'Erro ao bloquear/desbloquear usuário.' };
     }
   };
 
@@ -301,9 +360,9 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider value={{
       user, login, registerUser, logout, resetPassword, loading,
-      modules, addModule, deleteModule, toggleModuleVisibility,
+      modules, addModule, deleteModule, editModule, toggleModuleVisibility,
       submissions, addSubmission, markEvaluated, saveEvaluation, deleteSubmission,
-      fetchUsers, updateUserRole, updateUserProfile
+      fetchUsers, updateUserRole, toggleUserBlock, updateUserProfile
     }}>
       {!loading && children}
     </AppContext.Provider>

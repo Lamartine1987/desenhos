@@ -87,11 +87,14 @@ export default function Login() {
               <label className="input-label">Nome Completo</label>
               <input 
                 type="text" 
+                name="name"
                 className="input-field" 
                 placeholder="Ex: João Silva"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required={isRegistering}
+                autoComplete="name"
+                autoCapitalize="words"
               />
             </div>
           )}
@@ -100,11 +103,15 @@ export default function Login() {
             <label className="input-label">E-mail</label>
             <input 
               type="email" 
+              name="email"
               className="input-field" 
               placeholder="seu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
             />
           </div>
 
@@ -113,11 +120,13 @@ export default function Login() {
               <label className="input-label">Telefone (Whatsapp)</label>
               <input 
                 type="tel" 
+                name="phone"
                 className="input-field" 
                 placeholder="(00) 00000-0000"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required={isRegistering}
+                autoComplete="tel"
               />
             </div>
           )}
@@ -126,11 +135,13 @@ export default function Login() {
             <label className="input-label">Senha</label>
             <input 
               type="password" 
+              name="password"
               className="input-field" 
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </div>
 
@@ -224,11 +235,15 @@ export default function Login() {
                     <label className="input-label">E-mail Cadastrado</label>
                     <input 
                       type="email" 
+                      name="reset-email"
                       className="input-field" 
                       placeholder="seu@email.com"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       required
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
                     />
                   </div>
                   <div className="flex flex-col gap-3">

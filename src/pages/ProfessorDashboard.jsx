@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { Folder, Plus, Eye, EyeOff, Trash2, Users } from 'lucide-react';
+import { Folder, Plus, Eye, EyeOff, Trash2, Users, Edit3 } from 'lucide-react';
 import ProfessorUsers from '../components/ProfessorUsers';
 import ProfessorAnalytics from '../components/ProfessorAnalytics';
 import { BarChart3 } from 'lucide-react';
+import { getCountFromServer, collection, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function ProfessorDashboard() {
-  const { modules, addModule, submissions, user, deleteModule, toggleModuleVisibility } = useAppContext();
+  const { modules, addModule, submissions, user, deleteModule, toggleModuleVisibility, editModule } = useAppContext();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('modules'); // 'modules', 'users', 'analytics'
@@ -15,8 +17,45 @@ export default function ProfessorDashboard() {
   const [newModName, setNewModName] = useState('');
   const [newModDesc, setNewModDesc] = useState('');
   const [moduleToDelete, setModuleToDelete] = useState(null);
+  const [moduleToEdit, setModuleToEdit] = useState(null);
+  const [editModName, setEditModName] = useState('');
+  const [editModDesc, setEditModDesc] = useState('');
+  const [moduleCounts, setModuleCounts] = useState({});
 
   if (!user || user.role !== 'professor') return <div>Acesso negado</div>;
+
+  const fetchCounts = React.useCallback(async () => {
+    const counts = {};
+    for (const mod of modules) {
+      try {
+        const pendingQ = query(collection(db, 'submissions'), where('moduleId', '==', mod.id), where('status', '==', 'pending'));
+        const evalQ = query(collection(db, 'submissions'), where('moduleId', '==', mod.id), where('status', '==', 'evaluated'));
+        
+        const [pendingSnap, evalSnap] = await Promise.all([
+          getCountFromServer(pendingQ),
+          getCountFromServer(evalQ)
+        ]);
+        
+        counts[mod.id] = {
+          pending: pendingSnap.data().count,
+          evaluated: evalSnap.data().count,
+          total: pendingSnap.data().count + evalSnap.data().count
+        };
+      } catch (error) {
+        console.error("Error fetching counts for module", mod.id, error);
+        counts[mod.id] = { pending: 0, evaluated: 0, total: 0 };
+      }
+    }
+    setModuleCounts(counts);
+  }, [modules]);
+
+  React.useEffect(() => {
+    if (modules.length > 0 && activeTab === 'modules') {
+      fetchCounts();
+      const interval = setInterval(fetchCounts, 15000); // Auto refresh every 15s for real-time feel
+      return () => clearInterval(interval);
+    }
+  }, [modules, activeTab, fetchCounts]);
 
   const handleCreateModule = (e) => {
     e.preventDefault();
@@ -25,6 +64,14 @@ export default function ProfessorDashboard() {
       setNewModName('');
       setNewModDesc('');
       setShowModal(false);
+    }
+  };
+
+  const handleEditModule = async (e) => {
+    e.preventDefault();
+    if (editModName && moduleToEdit) {
+      await editModule(moduleToEdit.id, editModName, editModDesc);
+      setModuleToEdit(null);
     }
   };
 
@@ -70,9 +117,8 @@ export default function ProfessorDashboard() {
       {activeTab === 'modules' ? (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
           {modules.map(mod => {
-            const modSubmissions = submissions.filter(s => s.moduleId === mod.id);
-            const pendingCount = modSubmissions.filter(s => s.status === 'pending').length;
-            const evaluatedCount = modSubmissions.filter(s => s.status === 'evaluated').length;
+            const counts = moduleCounts[mod.id] || { pending: 0, evaluated: 0, total: 0 };
+            const { pending: pendingCount, evaluated: evaluatedCount, total: totalCount } = counts;
 
             return (
               <div 
@@ -103,6 +149,18 @@ export default function ProfessorDashboard() {
                      <button
                        onClick={(e) => {
                          e.stopPropagation();
+                         setEditModName(mod.name);
+                         setEditModDesc(mod.description || '');
+                         setModuleToEdit(mod);
+                       }}
+                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                       title="Editar módulo"
+                     >
+                       <Edit3 size={20} />
+                     </button>
+                     <button
+                       onClick={(e) => {
+                         e.stopPropagation();
                          setModuleToDelete(mod);
                        }}
                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
@@ -116,7 +174,7 @@ export default function ProfessorDashboard() {
                 
                 <div className="flex items-center gap-4 border-t" style={{ borderColor: 'var(--border-color)', paddingTop: '1rem' }}>
                   <div className="flex flex-col">
-                    <span className="text-2xl font-bold">{modSubmissions.length}</span>
+                    <span className="text-2xl font-bold">{totalCount}</span>
                     <span className="text-xs text-muted uppercase tracking-wider">Total</span>
                   </div>
                   <div className="flex flex-col text-warning">
@@ -174,6 +232,46 @@ export default function ProfessorDashboard() {
               <div className="flex gap-4 justify-end">
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">Criar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {moduleToEdit && (
+        <div 
+          style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 50
+          }}
+        >
+          <div className="glass-panel" style={{ padding: '2rem', width: '100%', maxWidth: '500px' }}>
+            <h3 className="text-xl font-bold mb-4">Editar Módulo</h3>
+            <form onSubmit={handleEditModule}>
+              <div className="input-group">
+                <label className="input-label">Nome do Módulo</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editModName} 
+                  onChange={e => setEditModName(e.target.value)} 
+                  required 
+                />
+              </div>
+              <div className="input-group mb-6">
+                <label className="input-label">Descrição</label>
+                <textarea 
+                  className="input-field" 
+                  value={editModDesc} 
+                  onChange={e => setEditModDesc(e.target.value)} 
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-4 justify-end">
+                <button type="button" className="btn btn-outline" onClick={() => setModuleToEdit(null)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary">Salvar</button>
               </div>
             </form>
           </div>

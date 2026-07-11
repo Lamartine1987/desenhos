@@ -7,7 +7,6 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
   const containerRef = useRef(null);
   const [imageObj, setImageObj] = useState(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [isMoveMode, setIsMoveMode] = useState(false); // true = move/zoom, false = draw
   
   // Drawing states
   const [paths, setPaths] = useState([]); // Array of { points: [], color, size }
@@ -17,6 +16,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
   
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isPanMode, setIsPanMode] = useState(false);
 
   const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#000000', '#ffffff'];
   const sizes = [
@@ -88,7 +88,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
     redraw();
   }, [redraw]);
 
-  // Helper to get scaled coordinates
+  // Redraw canvas whenever image or paths change
   const getCoordinates = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -115,8 +115,9 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
   };
 
   const startDrawing = (e) => {
-    // Only prevent default for mouse, to allow button clicks to work properly
-    if(e.type !== 'touchstart') {
+    if (e.touches && e.touches.length > 1) return; // Prevent drawing when zooming
+    // Prevent default on the canvas to stop iOS magnifier and text selection callouts
+    if (e.cancelable) {
       e.preventDefault();
     }
     
@@ -129,6 +130,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
 
   const draw = (e) => {
     if (!isDrawing) return;
+    if (e.touches && e.touches.length > 1) return; // Prevent drawing when zooming
     if(e.cancelable) {
        e.preventDefault();
     }
@@ -180,7 +182,10 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: '#000', zIndex: 1000,
-        display: 'flex', flexDirection: 'column'
+        display: 'flex', flexDirection: 'column',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none'
       }}
     >
       {/* Header Toolbar */}
@@ -207,7 +212,7 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
         </div>
         
         {/* Color and Brush Tools */}
-        <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto px-2" style={{ maxWidth: '50%', scrollbarWidth: 'none', transition: 'opacity 0.3s', opacity: isMoveMode ? 0.3 : 1, pointerEvents: isMoveMode ? 'none' : 'auto' }}>
+        <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto px-2" style={{ maxWidth: '50%', scrollbarWidth: 'none' }}>
            <div className="flex gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
              {colors.map(color => (
                <button
@@ -244,6 +249,17 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
         </div>
 
         <div className="flex gap-2 shrink-0">
+          <button
+            className={`btn ${isPanMode ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '0.5rem', borderColor: '#3f3f46', color: isPanMode ? 'white' : '#d4d4d8' }}
+            onClick={() => setIsPanMode(!isPanMode)}
+            title={isPanMode ? "Modo Desenhar" : "Modo Mover"}
+          >
+            {isPanMode ? <PenLine size={18} /> : <Hand size={18} />}
+          </button>
+
+          <div style={{ width: '1px', backgroundColor: '#3f3f46', margin: '0 0.5rem' }}></div>
+
           <button 
             className="btn btn-outline"
             style={{ color: '#d4d4d8', borderColor: '#3f3f46', padding: '0.5rem' }}
@@ -280,53 +296,6 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
         </div>
       </div>
 
-      {/* Mode Toggle (Floating) */}
-      <div 
-        style={{
-          position: 'absolute',
-          bottom: '2rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: '0.5rem',
-          background: '#18181b',
-          padding: '0.5rem',
-          borderRadius: '2rem',
-          border: '1px solid #3f3f46',
-          zIndex: 1010,
-          boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-        }}
-      >
-        <button
-          className="btn"
-          style={{
-            padding: '0.5rem 1.5rem',
-            borderRadius: '1.5rem',
-            background: !isMoveMode ? '#ef4444' : 'transparent',
-            color: !isMoveMode ? 'white' : '#a1a1aa',
-            border: 'none'
-          }}
-          onClick={() => setIsMoveMode(false)}
-        >
-          <PenLine size={20} />
-          <span className="ml-2 font-bold hidden sm:inline">Desenhar</span>
-        </button>
-        <button
-          className="btn"
-          style={{
-            padding: '0.5rem 1.5rem',
-            borderRadius: '1.5rem',
-            background: isMoveMode ? '#3b82f6' : 'transparent',
-            color: isMoveMode ? 'white' : '#a1a1aa',
-            border: 'none'
-          }}
-          onClick={() => setIsMoveMode(true)}
-        >
-          <Hand size={20} />
-          <span className="ml-2 font-bold hidden sm:inline">Mover / Zoom</span>
-        </button>
-      </div>
-
       {/* Canvas Area */}
       <div 
         ref={containerRef}
@@ -354,40 +323,57 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
           <TransformWrapper
             initialScale={1}
             minScale={0.5}
-            maxScale={5}
-            panning={{ disabled: !isMoveMode }}
-            pinch={{ disabled: !isMoveMode }}
+            maxScale={10}
+            centerOnInit={true}
+            centerZoomedOut={true}
+            panning={{ disabled: false, excluded: isPanMode ? [] : ['drawing-canvas'] }}
+            pinch={{ disabled: false }}
             doubleClick={{ disabled: true }}
-            wheel={{ step: 0.1, disabled: !isMoveMode }}
+            wheel={{ step: 0.0001, smooth: true }}
           >
-            <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <TransformComponent 
+              wrapperStyle={{ width: '100%', height: '100%' }}
+              contentStyle={{ width: '100%', height: '100%', position: 'relative' }}
+            >
+              <div style={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)', 
+                maxWidth: '100%', 
+                maxHeight: '100%', 
+                display: 'inline-block' 
+              }}>
                 <img 
                   src={imageObj.src} 
                   alt="Fundo" 
-                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', pointerEvents: 'none' }} 
+                  style={{ maxWidth: '100%', maxHeight: '100%', display: 'block', pointerEvents: 'none' }} 
                 />
-            <canvas
-              ref={canvasRef}
-              width={imageObj.width}
-              height={imageObj.height}
-              style={{
-                position: 'absolute',
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                cursor: isMoveMode ? 'grab' : 'crosshair',
-                touchAction: 'none' // Prevent scrolling on touch devices while drawing
-              }}
-              onMouseDown={(e) => { if(!isMoveMode) startDrawing(e); }}
-              onMouseMove={(e) => { if(!isMoveMode) draw(e); }}
-              onMouseUp={(e) => { if(!isMoveMode) stopDrawing(e); }}
-              onMouseLeave={(e) => { if(!isMoveMode) stopDrawing(e); }}
-              onTouchStart={(e) => { if(!isMoveMode) startDrawing(e); }}
-              onTouchMove={(e) => { if(!isMoveMode) draw(e); }}
-              onTouchEnd={(e) => { if(!isMoveMode) stopDrawing(e); }}
-            />
-              </div>
+                <canvas
+                    ref={canvasRef}
+                    className="drawing-canvas"
+                    width={imageObj.width}
+                    height={imageObj.height}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 10,
+                      cursor: isPanMode ? 'grab' : 'crosshair',
+                      touchAction: 'none'
+                    }}
+                    onMouseDown={(e) => { if(!isPanMode) startDrawing(e); }}
+                    onMouseMove={(e) => { if(!isPanMode) draw(e); }}
+                    onMouseUp={(e) => { if(!isPanMode) stopDrawing(e); }}
+                    onMouseLeave={(e) => { if(!isPanMode) stopDrawing(e); }}
+                    onTouchStart={(e) => { if(!isPanMode) startDrawing(e); }}
+                    onTouchMove={(e) => { if(!isPanMode) draw(e); }}
+                    onTouchEnd={(e) => { if(!isPanMode) stopDrawing(e); }}
+                    onContextMenu={(e) => { e.preventDefault(); return false; }}
+                  />
+                </div>
             </TransformComponent>
           </TransformWrapper>
         )}

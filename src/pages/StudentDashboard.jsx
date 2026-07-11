@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { FolderUp, Sparkles, PenTool, Trash2 } from 'lucide-react';
+import { useInView } from 'react-intersection-observer';
 
 export default function StudentDashboard() {
   const { modules, user, submissions, deleteSubmission } = useAppContext();
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(null);
   const [submissionToDelete, setSubmissionToDelete] = useState(null);
+  
+  // Pagination state
+  const [displayLimit, setDisplayLimit] = useState(6);
+  const { ref: observerRef, inView } = useInView({
+    threshold: 0.1,
+  });
+
+  useEffect(() => {
+    if (inView) {
+      setDisplayLimit(prev => prev + 6);
+    }
+  }, [inView]);
 
   if (!user) return null;
 
@@ -98,8 +111,8 @@ export default function StudentDashboard() {
             <h3 className="text-xl font-bold">Sua Galeria de Evolução</h3>
           </div>
           <div className="glass-panel p-4" style={{ padding: '1.5rem' }}>
-             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {studentSubmissions.map(sub => {
+              <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                {studentSubmissions.slice(0, displayLimit).map(sub => {
                   const modName = modules.find(m => m.id === sub.moduleId)?.name;
                   return (
                     <div 
@@ -118,9 +131,9 @@ export default function StudentDashboard() {
                       onClick={() => setSelectedImage({ original: sub.imageUrl, evaluated: sub.evaluatedImageUrl })}
                     >
                        <div style={{ position: 'relative', width: '100%', height: '150px' }}>
-                         <img src={sub.imageUrl} alt="Desenho" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                         <img src={sub.imageUrl} alt="Desenho" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                          {sub.evaluatedImageUrl && (
-                           <img src={sub.evaluatedImageUrl} alt="Correção" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                           <img src={sub.evaluatedImageUrl} alt="Correção" loading="lazy" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
                          )}
                        </div>
                        {sub.status === 'pending' && (
@@ -152,7 +165,14 @@ export default function StudentDashboard() {
                     </div>
                   )
                 })}
-             </div>
+              </div>
+              
+              {/* Intersection Observer target para paginação infinita */}
+              {displayLimit < studentSubmissions.length && (
+                <div ref={observerRef} className="py-6 text-center text-muted">
+                  Carregando mais...
+                </div>
+              )}
           </div>
         </div>
       )}
