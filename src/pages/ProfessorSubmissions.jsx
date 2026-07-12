@@ -156,16 +156,16 @@ export default function ProfessorSubmissions() {
         Voltar
       </button>
 
-      <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-6 mb-8 mt-2">
-        <div className="xl:w-1/3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem', marginTop: '0.5rem' }}>
+        <div>
           <h2 className="text-3xl font-bold text-gradient mb-2">{module.name}</h2>
           <p className="text-muted">Avaliando artes dos alunos.</p>
         </div>
         
-        <div className="flex flex-wrap gap-4 w-full xl:w-auto xl:flex-1 xl:justify-end">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', width: '100%' }}>
           <select 
-            className="input-field flex-1 min-w-[180px]" 
-            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0 }}
+            className="input-field" 
+            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0, width: '100%' }}
             value={lessonFilter}
             onChange={(e) => setLessonFilter(e.target.value)}
           >
@@ -176,8 +176,8 @@ export default function ProfessorSubmissions() {
           </select>
 
           <select 
-            className="input-field flex-1 min-w-[180px]" 
-            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0 }}
+            className="input-field" 
+            style={{ padding: '0.6rem 2.5rem 0.6rem 1rem', marginBottom: 0, width: '100%' }}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -186,14 +186,14 @@ export default function ProfessorSubmissions() {
             <option value="evaluated">Já Avaliadas</option>
           </select>
 
-          <button className="btn btn-outline flex-1 min-w-[180px]" onClick={() => setShowLessonModal(true)}>
+          <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={() => setShowLessonModal(true)}>
             <List size={20} />
-            Gerenciar Aulas
+            <span>Gerenciar Aulas</span>
           </button>
 
-          <button className="btn btn-primary flex-1 min-w-[180px]" onClick={handleDownloadAll} disabled={filteredSubmissions.length === 0}>
+          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={handleDownloadAll} disabled={filteredSubmissions.length === 0}>
             <DownloadCloud size={20} />
-            Baixar .zip ({filteredSubmissions.length})
+            <span>Baixar .zip ({filteredSubmissions.length})</span>
           </button>
         </div>
       </div>

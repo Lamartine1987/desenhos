@@ -181,14 +181,15 @@ export default function ModuleUpload() {
               return (
                 <div 
                   key={lesson.id} 
-                  className={`glass-card flex justify-between items-center p-4 transition-all ${isPending ? 'opacity-80' : 'hover:border-primary/50 cursor-pointer'}`}
+                  className={`glass-card transition-all ${isPending ? 'opacity-80' : 'hover:border-primary/50 cursor-pointer'}`}
+                  style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', gap: '1rem' }}
                   onClick={() => {
                     setSelectedLesson(lesson);
                   }}
                   title={isPending ? 'Aguardando correção do professor' : 'Clique para enviar seu desenho'}
                 >
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-3 mb-1">
+                  <div className="flex flex-col" style={{ flex: '1 1 min-content', minWidth: '150px' }}>
+                    <div className="flex items-center gap-3 mb-1" style={{ flexWrap: 'wrap' }}>
                       <span className="font-bold text-lg leading-none">{lesson.title}</span>
                       {submissionCount > 0 && (
                         <span 
@@ -199,7 +200,8 @@ export default function ModuleUpload() {
                             color: 'rgba(0,0,0,0.6)',
                             padding: '0.2rem 0.6rem',
                             borderRadius: '1rem',
-                            border: '1px solid rgba(0,0,0,0.05)'
+                            border: '1px solid rgba(0,0,0,0.05)',
+                            whiteSpace: 'nowrap'
                           }}
                           title="Quantidade de envios"
                         >
@@ -215,21 +217,21 @@ export default function ModuleUpload() {
                       <span className="text-sm text-muted">Não enviado</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
                     {mySubmission && !isPending && (
-                       <button className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                       <button className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)', whiteSpace: 'nowrap' }}>
                          Enviar Novamente
                        </button>
                     )}
                     {mySubmission ? (
-                      <div style={{ width: '4rem', height: '3rem', borderRadius: '0.25rem', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)', position: 'relative' }}>
+                      <div style={{ width: '4rem', height: '3rem', borderRadius: '0.25rem', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.1)', position: 'relative', flexShrink: 0 }}>
                          <img src={mySubmission.imageUrl} alt="Meu desenho" style={{width:'100%', height:'100%', objectFit:'cover'}} />
                          {mySubmission.evaluatedImageUrl && (
                            <img src={mySubmission.evaluatedImageUrl} alt="Correção" style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', objectFit:'cover'}} />
                          )}
                       </div>
                     ) : (
-                      <button className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                      <button className="btn btn-primary" style={{ padding: '0.5rem 1rem', whiteSpace: 'nowrap' }}>
                         Enviar
                       </button>
                     )}

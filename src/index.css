@@ -135,7 +135,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Segmented Tabs */
 .tabs-container {
-  display: inline-flex;
+  display: flex;
   gap: 0.5rem;
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.03);
@@ -143,6 +143,16 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0.35rem;
   margin-bottom: 2rem;
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+}
+
+.tabs-container::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
 }
 
 .tab-btn {
@@ -154,6 +164,7 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Outfit', sans-serif;
   font-weight: 500;
   font-size: 0.95rem;
+  flex-shrink: 0;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;

@@ -191,15 +191,17 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
     >
       {/* Header Toolbar */}
       <div 
-        className="flex justify-between items-center px-4 pr-6 sm:pr-8"
+        className="flex justify-between items-center px-2 sm:px-4"
         style={{ 
           backgroundColor: '#18181b', 
           borderBottom: '1px solid #27272a',
-          paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
-          paddingBottom: '1rem'
+          paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)',
+          paddingBottom: '0.5rem',
+          flexWrap: 'wrap',
+          gap: '12px 8px'
         }}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <button 
             className="btn btn-outline" 
             style={{ color: 'white', borderColor: '#3f3f46', padding: '0.5rem' }}
@@ -207,13 +209,13 @@ export default function EvaluationStudio({ submission, onSave, onClose }) {
           >
             <X size={20} />
           </button>
-          <div className="text-white hidden sm:block">
+          <div className="text-white hidden md:block">
             <h3 className="font-bold text-sm">Avaliando: {submission.studentName}</h3>
           </div>
         </div>
         
         {/* Color and Brush Tools */}
-        <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto px-2" style={{ maxWidth: '50%', scrollbarWidth: 'none' }}>
+        <div className="flex items-center justify-center gap-2 sm:gap-4 overflow-x-auto flex-1 px-1" style={{ minWidth: '260px', scrollbarWidth: 'none' }}>
            <div className="flex gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
              {colors.map(color => (
                <button
