@@ -312,7 +312,8 @@ export default function ProfessorSubmissions() {
         >
           <div className="glass-panel flex flex-col" style={{ 
             padding: '2.5rem', width: '90%', maxWidth: '600px', maxHeight: '90vh',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column'
           }}>
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-bold text-gradient">Gerenciar Aulas</h3>
@@ -346,7 +347,7 @@ export default function ProfessorSubmissions() {
               )}
             </form>
 
-            <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: '400px' }}>
+            <div className="flex-1 pr-2" style={{ overflowY: 'auto', minHeight: 0 }}>
               <h4 className="font-bold mb-4 text-muted">Aulas Cadastradas</h4>
               {module.lessons && module.lessons.length > 0 ? (
                 <div className="flex flex-col gap-3">
